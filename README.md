@@ -93,6 +93,55 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+#### Run on RunPod
+
+You can run **Wan2.1** on [RunPod](https://docs.runpod.io/) either as a long‑running Pod or as a Serverless endpoint.
+
+- **Option 1 – Pod (simplest)**
+  - Build an image or use a PyTorch base image, then inside the Pod:
+    ```sh
+    git clone https://github.com/Wan-Video/Wan2.1.git
+    cd Wan2.1
+    pip install -r requirements.txt
+    ```
+  - Download your desired checkpoints into the Pod (for example `/workspace/Wan2.1-T2V-14B`), then run any of the commands from this README, e.g.:
+    ```sh
+    python generate.py --task t2v-14B --size 1280*720 --ckpt_dir /workspace/Wan2.1-T2V-14B --prompt "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage."
+    ```
+
+- **Option 2 – Serverless endpoint (using `handler.py`)**
+  - This repo includes a `handler.py` that exposes `generate.py` via `runpod.serverless`:
+    - It expects an event of the form:
+      ```json
+      {
+        "input": {
+          "task": "t2v-14B",
+          "size": "1280*720",
+          "ckpt_dir": "/workspace/Wan2.1-T2V-14B",
+          "prompt": "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage."
+        }
+      }
+      ```
+  - **Minimal Dockerfile example**:
+    ```Dockerfile
+    FROM nvidia/cuda:12.1.1-cudnn9-runtime-ubuntu22.04
+
+    ENV DEBIAN_FRONTEND=noninteractive
+    RUN apt-get update && apt-get install -y python3 python3-pip git && rm -rf /var/lib/apt/lists/*
+
+    WORKDIR /workspace
+    COPY . /workspace
+
+    RUN pip3 install --no-cache-dir -r requirements.txt
+
+    # Default to serverless worker
+    CMD ["python3", "-u", "handler.py"]
+    ```
+  - Build and push this image, then create a **Serverless GPU** endpoint on RunPod using the image.
+  - Place your checkpoints in the container (for example `/workspace/Wan2.1-T2V-14B`) and either:
+    - Set the `ckpt_dir` field in your request, or
+    - Set the `WAN_CKPT_DIR` environment variable on the endpoint.
+  - The worker will save the generated file inside the container and return metadata including `save_file` in the response.
 
 #### Model Download
 
